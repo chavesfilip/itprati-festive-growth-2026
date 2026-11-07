@@ -12,6 +12,8 @@ credentials/
 .DS_Store
 Thumbs.db
 node_modules/
+.next/
+out/
 dist/
 build/
 coverage/
