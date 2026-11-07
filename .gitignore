@@ -1,0 +1,28 @@
+# Secrets and environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+private/
+credentials/
+
+# Local tooling
+.DS_Store
+Thumbs.db
+node_modules/
+dist/
+build/
+coverage/
+.cache/
+.vscode/
+.idea/
+
+# Customer and operational data (never commit)
+leads*.csv
+customers*.csv
+clients*.csv
+contacts*.csv
+personal-data/
+exports/private/
