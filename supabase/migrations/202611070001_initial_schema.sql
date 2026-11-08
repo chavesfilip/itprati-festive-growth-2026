@@ -1,22 +1,25 @@
+-- Growth Control Center: schema isolated from the existing iTpraTi website.
+-- IMPORTANT: the website's public.leads table is intentionally untouched.
 create extension if not exists pgcrypto;
 create type public.app_role as enum ('admin','marketing','sales','viewer');
 create type public.lead_status as enum ('new','contacted','proposal','contracted','paid','activated','rejected');
 create type public.referral_status as enum ('pending','validated','reward_unlocked','reward_applied','rejected');
 create table public.profiles(id uuid primary key references auth.users(id) on delete cascade,full_name text,role public.app_role not null default 'viewer',created_at timestamptz not null default now(),updated_at timestamptz not null default now());
-create table public.leads(id uuid primary key default gen_random_uuid(),full_name text not null,phone text,email text,service_interest text,source text,status public.lead_status not null default 'new',assigned_to uuid references public.profiles(id) on delete set null,notes text,created_at timestamptz not null default now(),updated_at timestamptz not null default now());
+-- Separate campaign pipeline. Do not rename or modify public.leads used by itprati.ao.
+create table public.campaign_leads(id uuid primary key default gen_random_uuid(),full_name text not null,phone text,email text,service_interest text,source text,status public.lead_status not null default 'new',assigned_to uuid references public.profiles(id) on delete set null,notes text,created_at timestamptz not null default now(),updated_at timestamptz not null default now());
 create table public.campaign_tasks(id uuid primary key default gen_random_uuid(),title text not null,description text,due_date date,status text not null default 'todo' check(status in('todo','in_progress','blocked','done')),owner_id uuid references public.profiles(id) on delete set null,channel text,created_at timestamptz not null default now(),updated_at timestamptz not null default now());
 create table public.referral_codes(id uuid primary key default gen_random_uuid(),owner_name text not null,code text not null unique,owner_phone text,active boolean not null default true,created_at timestamptz not null default now());
-create table public.referrals(id uuid primary key default gen_random_uuid(),referral_code_id uuid not null references public.referral_codes(id),referred_lead_id uuid references public.leads(id) on delete set null,status public.referral_status not null default 'pending',validated_at timestamptz,reward_applied_at timestamptz,reviewed_by uuid references public.profiles(id) on delete set null,review_note text,created_at timestamptz not null default now());
+create table public.referrals(id uuid primary key default gen_random_uuid(),referral_code_id uuid not null references public.referral_codes(id),referred_lead_id uuid references public.campaign_leads(id) on delete set null,status public.referral_status not null default 'pending',validated_at timestamptz,reward_applied_at timestamptz,reviewed_by uuid references public.profiles(id) on delete set null,review_note text,created_at timestamptz not null default now());
 create table public.link_contest_participants(id uuid primary key default gen_random_uuid(),display_name text not null,slug text not null unique,contact_email text,active boolean not null default true,created_at timestamptz not null default now());
 create table public.link_contest_visits(id uuid primary key default gen_random_uuid(),participant_id uuid not null references public.link_contest_participants(id) on delete cascade,visitor_fingerprint_hash text not null,visited_at timestamptz not null default now(),is_valid boolean not null default true,review_status text not null default 'pending' check(review_status in('pending','approved','rejected')),unique(participant_id,visitor_fingerprint_hash));
 create table public.expenses(id uuid primary key default gen_random_uuid(),description text not null,category text,amount_aoa numeric(14,2) not null check(amount_aoa>=0),spent_on date not null default current_date,recorded_by uuid references public.profiles(id) on delete set null,created_at timestamptz not null default now());
 create table public.audit_logs(id bigint generated always as identity primary key,actor_id uuid references public.profiles(id) on delete set null,action text not null,entity_table text not null,entity_id text,details jsonb not null default '{}'::jsonb,created_at timestamptz not null default now());
-create index leads_status_created_idx on public.leads(status,created_at desc);
+create index campaign_leads_status_created_idx on public.campaign_leads(status,created_at desc);
 create index tasks_due_status_idx on public.campaign_tasks(due_date,status);
 create index referrals_status_idx on public.referrals(status);
 create index contest_visits_participant_idx on public.link_contest_visits(participant_id,review_status);
 alter table public.profiles enable row level security;
-alter table public.leads enable row level security;
+alter table public.campaign_leads enable row level security;
 alter table public.campaign_tasks enable row level security;
 alter table public.referral_codes enable row level security;
 alter table public.referrals enable row level security;
@@ -24,5 +27,6 @@ alter table public.link_contest_participants enable row level security;
 alter table public.link_contest_visits enable row level security;
 alter table public.expenses enable row level security;
 alter table public.audit_logs enable row level security;
+-- Intentionally no public/anonymous access policies. Add role-scoped policies before production use.
 create policy "profiles_read_own" on public.profiles for select to authenticated using(id=(select auth.uid()));
 create or replace function public.set_updated_at() returns trigger language plpgsql as $$ begin new.updated_at=now(); return new; end; $$;
