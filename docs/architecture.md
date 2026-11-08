@@ -29,3 +29,10 @@
 
 ## Publicação
 Importar o repositório na Vercel, definir variáveis de ambiente e fazer deploy. A publicação só estará concluída após build e teste de produção bem-sucedidos.
+
+## Supabase existente — iTpraTi-site
+O projecto Supabase existente será reutilizado: Project ID `yfoxvgyqekneckqowvip`.
+A tabela `public.leads` pertence ao formulário/site iTpraTi e não deve ser recriada, renomeada ou alterada por esta campanha.
+A campanha usa `public.campaign_leads` para manter o pipeline comercial separado.
+A migração inicial foi ajustada para respeitar esta separação. Não executar versões anteriores desta migração.
+O URL e a publishable key devem ser configurados como variáveis de ambiente na Vercel e localmente; não guardar valores reais no Git.
