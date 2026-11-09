@@ -17,6 +17,7 @@ interface Lead {
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({
     full_name: '',
@@ -29,18 +30,28 @@ export default function LeadsPage() {
   const supabase = createClient();
   const TARGET_GOAL = 150;
 
-  // Carregar leads do Supabase
+  // Carregar leads do Supabase com tratamento defensivo contra crashes
   const fetchLeads = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('leads')
-      .select('*')
-      .order('created_at', { ascending: false });
+    setFetchError(null);
+    try {
+      const { data, error } = await supabase
+        .from('leads')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    if (!error && data) {
-      setLeads(data as Lead[]);
+      if (error) {
+        console.error('Erro na consulta Supabase:', error);
+        setFetchError(error.message);
+      } else if (data) {
+        setLeads(data as Lead[]);
+      }
+    } catch (err: unknown) {
+      console.error('Exceção capturada ao carregar leads:', err);
+      setFetchError('Não foi possível estabelecer ligação à base de dados. Verifica as variáveis de ambiente.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [supabase]);
 
   useEffect(() => {
@@ -50,24 +61,39 @@ export default function LeadsPage() {
   // Adicionar Lead vindo do WhatsApp
   const handleCreateLead = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { error } = await supabase.from('leads').insert([
-      {
-        ...formData,
-        status: 'novo',
-      }
-    ]);
+    try {
+      const { error } = await supabase.from('leads').insert([
+        {
+          ...formData,
+          status: 'novo',
+        }
+      ]);
 
-    if (!error) {
-      setShowModal(false);
-      setFormData({ full_name: '', phone: '', location: '', product_interest: 'combo', notes: '' });
-      fetchLeads();
+      if (error) {
+        alert(`Erro ao guardar lead: ${error.message}`);
+      } else {
+        setShowModal(false);
+        setFormData({ full_name: '', phone: '', location: '', product_interest: 'combo', notes: '' });
+        fetchLeads();
+      }
+    } catch (err: unknown) {
+      alert('Erro inesperado ao criar lead.');
+      console.error(err);
     }
   };
 
   // Atualizar Estado do Funil
   const handleStatusChange = async (id: string, newStatus: Lead['status']) => {
-    await supabase.from('leads').update({ status: newStatus }).eq('id', id);
-    fetchLeads();
+    try {
+      const { error } = await supabase.from('leads').update({ status: newStatus }).eq('id', id);
+      if (error) {
+        alert(`Erro ao atualizar estado: ${error.message}`);
+      } else {
+        fetchLeads();
+      }
+    } catch (err: unknown) {
+      console.error('Erro ao atualizar estado:', err);
+    }
   };
 
   // Métricas de Progresso
@@ -87,7 +113,7 @@ export default function LeadsPage() {
           </div>
           <button
             onClick={() => setShowModal(true)}
-            className="bg-[#39B8C9] hover:bg-[#DFF7F8] text-[#082B49] font-bold py-2 px-4 rounded-lg transition-all"
+            className="bg-[#39B8C9] hover:bg-[#DFF7F8] text-[#082B49] font-bold py-2 px-4 rounded-lg transition-all shadow-md"
           >
             + Registar Lead WhatsApp
           </button>
@@ -130,15 +156,30 @@ export default function LeadsPage() {
         </div>
       </div>
 
+      {/* Alerta de erro de ligação se existir */}
+      {fetchError && (
+        <div className="bg-red-500/20 border border-red-500/50 p-4 rounded-xl text-red-200 text-sm">
+          <strong>Atenção:</strong> {fetchError}
+        </div>
+      )}
+
       {/* Tabela de Leads */}
       <div className="bg-[#082B49] border border-[#087CA5]/40 rounded-xl overflow-hidden shadow-lg">
-        <div className="p-4 border-b border-[#087CA5]/30">
+        <div className="p-4 border-b border-[#087CA5]/30 flex justify-between items-center">
           <h2 className="text-lg font-bold text-[#DFF7F8]">Contactos Recebidos</h2>
+          <button 
+            onClick={fetchLeads}
+            className="text-xs text-[#39B8C9] hover:text-[#DFF7F8] underline"
+          >
+            Atualizar dados
+          </button>
         </div>
         {loading ? (
-          <div className="p-8 text-center text-gray-400">A carregar leads...</div>
+          <div className="p-8 text-center text-gray-400">A carregar leads do Supabase...</div>
         ) : leads.length === 0 ? (
-          <div className="p-8 text-center text-gray-400">Nenhum lead registado ainda.</div>
+          <div className="p-8 text-center text-gray-400">
+            {fetchError ? 'Não foi possível carregar a lista de leads.' : 'Nenhum lead registado ainda.'}
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
