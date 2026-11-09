@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 interface Lead {
@@ -22,7 +22,7 @@ export default function LeadsPage() {
     full_name: '',
     phone: '',
     location: '',
-    product_interest: 'combo',
+    product_interest: 'combo' as 'internet' | 'tv_online' | 'box_android' | 'combo',
     notes: ''
   });
 
@@ -30,7 +30,7 @@ export default function LeadsPage() {
   const TARGET_GOAL = 150;
 
   // Carregar leads do Supabase
-  const fetchLeads = async () => {
+  const fetchLeads = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('leads')
@@ -41,11 +41,11 @@ export default function LeadsPage() {
       setLeads(data as Lead[]);
     }
     setLoading(false);
-  };
+  }, [supabase]);
 
   useEffect(() => {
     fetchLeads();
-  }, []);
+  }, [fetchLeads]);
 
   // Adicionar Lead vindo do WhatsApp
   const handleCreateLead = async (e: React.FormEvent) => {
@@ -235,7 +235,7 @@ export default function LeadsPage() {
                 <label className="block text-xs font-medium text-gray-300">Serviço Pretendido</label>
                 <select
                   value={formData.product_interest}
-                  onChange={(e) => setFormData({ ...formData, product_interest: e.target.value as any })}
+                  onChange={(e) => setFormData({ ...formData, product_interest: e.target.value as 'internet' | 'tv_online' | 'box_android' | 'combo' })}
                   className="w-full bg-[#082B49] border border-[#087CA5] rounded p-2 text-sm mt-1 focus:outline-none focus:ring-1 focus:ring-[#39B8C9]"
                 >
                   <option value="combo">Internet + TV + Box</option>
